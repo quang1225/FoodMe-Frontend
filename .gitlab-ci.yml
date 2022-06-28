@@ -1,0 +1,103 @@
+stages:
+  # - build
+  - test
+  - deploy
+  - syncToBitbucket
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
+variables:
+  # Variables for deploy stage
+  SOURCE_PATH: '/var/www/foodme/discover-webapp'
+  PM2_APP_NAME: 'cdn-discover-webapp'
+  # Variables for SAST
+  SECURE_LOG_LEVEL: 'error'
+
+# Security check & report
+sast:
+  stage: test
+  tags:
+    - docker
+
+# Run Code quality with codeclimate
+code_quality:
+  stage: test
+  tags:
+    - codeclimate
+  artifacts:
+    paths:
+      - gl-code-quality-report.html
+  script:
+    # Run analyze in all project files.
+    - CONTAINER_TIMEOUT_SECONDS=1800 codeclimate analyze -f html > gl-code-quality-report.html
+
+# Deploy template
+.deploy_stage: &job_deploy_stage
+  stage: deploy
+  tags:
+    - shared
+  before_script:
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+  script:
+    - echo -e "$ENV_FILE_CONTENT" > .env
+    - scp ./.env $SSH_USER@$SSH_HOST:$SOURCE_PATH
+    # 1. Pull the latest source code on the commit branch
+    # 2. Docker build the image
+    # 3. Stop the web container & rm the web container
+    # 4. Run the built image with the name
+    # 5. Copy /app folder from container to host for hosting static files by CDN
+    # 6. Remove all temporary images with tag <none> => moved to cron to be better cache
+    # 7. Restart CDN server.
+    - |
+      ssh $SSH_USER@$SSH_HOST " cd $SOURCE_PATH \
+      && git checkout . \
+      && git fetch origin $CI_COMMIT_BRANCH \
+      && git checkout $CI_COMMIT_BRANCH \
+      && git pull origin $CI_COMMIT_BRANCH \
+      && rm app/ -rf \
+      && docker build . -t foodme-webapp \
+      && docker container stop discover-webapp && docker container rm discover-webapp \
+      && docker run --restart=always -d -p 5000:5000 --env-file ./.env --name discover-webapp foodme-webapp \
+      && docker cp discover-webapp:/app/ ./ \
+      && pm2 restart $PM2_APP_NAME \
+      && exit"
+
+# Deploy stage
+deploy_dev:
+  <<: *job_deploy_stage
+  environment:
+    name: dev
+    url: https://foodme.dirox.dev
+  only:
+    - develop
+
+deploy_testing:
+  <<: *job_deploy_stage
+  environment:
+    name: testing
+    url: https://foodme.dirox.app
+  only:
+    - testing
+
+syncCode:
+  stage: syncToBitbucket
+  tags:
+    - shared
+  before_script:
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+  script:
+    - |
+      ssh $SSH_USER@$SSH_HOST " cd $SOURCE_PATH \
+      && git checkout . \
+      && git fetch origin $CI_COMMIT_BRANCH \
+      && git checkout $CI_COMMIT_BRANCH \
+      && git pull origin $CI_COMMIT_BRANCH --tags \
+      && git push bitbucket $CI_COMMIT_BRANCH --tags \
+      && exit"
+  only:
+    - develop
+    - staging
+    - master

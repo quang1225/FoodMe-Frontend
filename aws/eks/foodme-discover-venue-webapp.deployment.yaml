@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discover-venue-webapp-deployment
+  namespace: foodme-discover-venue-webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: discover-venue-webapp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: discover-venue-webapp
+    spec:
+      imagePullSecrets:
+        - name: foodme-discover-registry-key
+      containers:
+        - name: discover-venue-webapp
+          image: 893474055913.dkr.ecr.ap-southeast-2.amazonaws.com/foodme-discover:staging-webapp-v0.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - secretRef:
+                name: foodme-venue-webapp-env-vars

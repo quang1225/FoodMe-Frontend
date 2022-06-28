@@ -1,0 +1,9 @@
+node_modules
+*.log
+.next
+.git
+.gitignore
+.DS_Store
+.idea
+.sublime-*
+aws

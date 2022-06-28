@@ -1,0 +1,175 @@
+:root {
+  --swiper-theme-color: #00a175 !important;
+
+  /* Neutral/Black */
+  --neutral-black-1: #111111;
+
+  /* Neutral/Grey */
+  --neutral-1: #333333;
+  --neutral-2: #4f4f4f;
+  --neutral-3: #8b8b8b;
+  --neutral-4: #bdbdbd;
+  --neutral-5: #e0e0e0;
+  --neutral-6: #f2f2f2;
+  --neutral-7: #ffffff;
+
+  /* Secondary/Leafy Green */
+  --leafy-green-1: #076c4f;
+  --leafy-green-2: #00a175;
+  --leafy-green-3: #aee1d3;
+  --leafy-green-4: #e3f4ef;
+
+  /* Secondary/Orange Zest */
+  --orange-zest-1: #ff7456;
+  --orange-zest-2: #fd9979;
+  --orange-zest-3: #ffe1d1;
+  --orange-zest-4: #fff4ee;
+
+  /* Secondary/Fairy Floss Pink */
+  --fairy-floss-pink-1: #c44e8a;
+  --fairy-floss-pink-2: #e59cbd;
+  --fairy-floss-pink-3: #f9d7e4;
+  --fairy-floss-pink-4: #fcebf1;
+
+  /* Secondary/Baby Blue */
+  --baby-blue-1: #16b8c4;
+  --baby-blue-2: #7dd1d8;
+  --baby-blue-3: #d7f2f7;
+  --baby-blue-4: #ebf9fb;
+
+  /* Secondary/Baby Blue (30%) */
+  --baby-blue-30: #f3fbfd;
+}
+
+@font-face {
+  font-family: 'PP Agrandir';
+  src: url('../public/fonts/PPAgrandir-TightBold.otf');
+  font-weight: bold;
+  font-style: normal;
+}
+
+/* @font-face {
+  font-family: 'PP Agrandir';
+  src: url('../assets/fonts/PP-Agrandir/PPAgrandirText-Bold.otf')
+    format('truetype');
+} */
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Open Sans', sans-serif;
+}
+
+.title-font {
+  font-family: 'PP Agrandir' !important;
+  font-weight: 700 !important;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.Toastify__toast-container {
+  width: max-content;
+}
+
+.MuiTabs-scroller {
+  overflow: auto !important;
+}
+
+.swiper-container {
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.swiper {
+  width: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+@media screen and (max-width: 768px) {
+  .swiper {
+    width: 100%;
+    border-radius: 20px;
+    overflow: unset !important;
+  }
+}
+
+.swiper .swiper-slide {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 20px;
+  cursor: pointer;
+  overflow: hidden;
+}
+.swiper .swiper-slide img {
+  width: 100%;
+  border-radius: 20px;
+}
+
+.swiper .swiper-button-prev,
+.swiper .swiper-button-next {
+  width: 44px;
+  height: 44px;
+  border-radius: 40px;
+  overflow: hidden;
+  background: #00a175;
+  mix-blend-mode: multiply;
+}
+
+.swiper .swiper-button-prev:after,
+.swiper .swiper-button-next:after {
+  font-size: 17px;
+  color: white;
+  font-weight: bold;
+  z-index: 2;
+}
+
+@media screen and (max-width: 768px) {
+  .swiper-pagination {
+    bottom: -38px !important;
+  }
+
+  .swiper-pagination-bullet {
+    height: 12px !important;
+    width: 12px !important;
+    background: #aee1d3 !important;
+  }
+
+  .swiper-pagination-bullet-active {
+    background: #00a175 !important;
+    border: 2px solid #076c4f;
+  }
+}
+
+.swiper-pagination-bullet {
+  height: 12px !important;
+  width: 12px !important;
+}
+
+.swiper-pagination-bullet-active {
+  background: #00a175 !important;
+}
+
+.MuiDialog-container .MuiPaper-root {
+  margin: 10px;
+  width: 100%
+}

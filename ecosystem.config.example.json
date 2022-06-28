@@ -1,0 +1,19 @@
+{
+  "apps": [{
+    "name": "discover-webapp",
+    "script": "npm run start",
+
+    // Options reference: https://pm2.io/doc/en/runtime/reference/ecosystem-file/
+    "instances": 1, // Run node cluster with max CPU cores - 1.
+    "autorestart": true,
+    "watch": false,
+    "max_memory_restart": "999M", // pm2 auto checking max memory every 30 seconds.
+    "log_date_format": "YYYY-MM-DD HH:mm:ssZ",
+    "env": {
+      "NODE_ENV": "development"
+    },
+    "env_production": {
+      "NODE_ENV": "production"
+    }
+  }],
+}

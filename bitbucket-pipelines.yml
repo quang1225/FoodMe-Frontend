@@ -1,0 +1,177 @@
+# Requires CI/CD variables:
+# - AWS_ACCESS_KEY_ID
+# - AWS_SECRET_ACCESS_KEY
+# - AWS_DEFAULT_REGION
+# - AWS_S3_BUCKET_NAME
+# - IMAGE_TAG_PREFIX=staging-webapp-v
+# - ECR_REPOSITORY_NAME
+# - ECR_ORI_IMG_TAG=staging-webapp-v0.0.0
+# - EKS_CLUSTER_NAME
+#
+definitions:
+  services:
+    docker:
+      memory: 4096
+
+options:
+  docker: true
+  size: 2x
+
+pipelines:
+  branches:
+    staging:
+      - step:
+          runs-on:
+            - self.hosted
+          name: Build & Push image to ECR
+          script:
+            # Sample tag: staging-webapp-v0.1.0-123
+            # - IMAGE_TAG_PREFIX=staging-webapp-v
+            # - LATEST_TAG_VERSION=0.1.0
+            # - BITBUCKET_BUILD_NUMBER=123
+            - export LATEST_TAG_VERSION=$(git describe --tags $(git rev-list --tags --max-count=1))
+            - export ECR_IMAGE_TAG=$IMAGE_TAG_PREFIX$LATEST_TAG_VERSION-$BITBUCKET_BUILD_NUMBER
+            # Generate .env file
+            - echo "NODE_ENV=${NODE_ENV}" > .env
+            - echo "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" >> .env
+            - echo "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" >> .env
+            # Cognito
+            - echo "AWS_PROJECT_REGION=${AWS_PROJECT_REGION}" >> .env
+            - echo "AWS_USER_POOLS_ID=${AWS_USER_POOLS_ID}" >> .env
+            - echo "AWS_USERPOOLS_WEB_CLIENT_ID=${AWS_USERPOOLS_WEB_CLIENT_ID}" >> .env
+            - echo "SOCIAL_LOGIN_DOMAIN=${SOCIAL_LOGIN_DOMAIN}" >> .env
+            - echo "SOCIAL_LOGIN_REDIRECT=${SOCIAL_LOGIN_REDIRECT}" >> .env
+            - echo "CDN_URL=${CDN_URL}" >> .env
+            - echo "CDN_IMAGE_URL=${CDN_IMAGE_URL}" >> .env
+            - echo "GOOGLE_MAP_API_KEY=${GOOGLE_MAP_API_KEY}" >> .env
+            - echo "GOOGLE_TAG_ID=${GOOGLE_TAG_ID}" >> .env
+            - echo "BUSINESS_URL=${BUSINESS_URL}" >> .env
+            - echo "BUSINESS_LOGIN_URL=${BUSINESS_LOGIN_URL}" >> .env
+            - echo "BUSINESS_SIGNUP_URL=${BUSINESS_SIGNUP_URL}" >> .env
+            # Docker build
+            - >
+              docker build . --file Dockerfile --tag ${ECR_REPOSITORY_NAME}
+              --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+              --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+              --build-arg AWS_REGION=$AWS_DEFAULT_REGION
+              --build-arg BUCKET_NAME=$AWS_S3_BUCKET_NAME
+            - pipe: atlassian/aws-ecr-push-image:1.5.0
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                IMAGE_NAME: $ECR_REPOSITORY_NAME
+                TAGS: '${ECR_IMAGE_TAG}'
+          caches:
+            - docker
+          services:
+            - docker
+          size: 2x
+      - step:
+          runs-on:
+            - self.hosted
+          name: Deploy to UAT - EKS
+          deployment: staging
+          script:
+            - export LATEST_TAG_VERSION=$(git describe --tags $(git rev-list --tags --max-count=1))
+            - export ECR_IMAGE_TAG=$IMAGE_TAG_PREFIX$LATEST_TAG_VERSION-$BITBUCKET_BUILD_NUMBER
+            # Consumer: Update new image tag into deployment manifest.
+            - export EKS_K8S_DEPLOYMENT_FILE="aws/eks/foodme-discover-webapp.deployment.yaml"
+            - sed -i "s|${ECR_ORI_IMG_TAG}|${ECR_IMAGE_TAG}|g" ${EKS_K8S_DEPLOYMENT_FILE}
+            - pipe: atlassian/aws-eks-kubectl-run:2.2.0
+              variables:
+                AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+                AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                CLUSTER_NAME: $EKS_CLUSTER_NAME
+                KUBECTL_COMMAND: 'apply'
+                RESOURCE_PATH: $EKS_K8S_DEPLOYMENT_FILE
+                DEBUG: 'true'
+            # Venue app: Using the same image tag with consumer
+            - export EKS_K8S_VENUE_DEPLOYMENT_FILE="aws/eks/foodme-discover-venue-webapp.deployment.yaml"
+            - sed -i "s|${ECR_ORI_IMG_TAG}|${ECR_IMAGE_TAG}|g" ${EKS_K8S_VENUE_DEPLOYMENT_FILE}
+            - pipe: atlassian/aws-eks-kubectl-run:2.2.0
+              variables:
+                AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+                AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                CLUSTER_NAME: $EKS_CLUSTER_NAME
+                KUBECTL_COMMAND: 'apply'
+                RESOURCE_PATH: $EKS_K8S_VENUE_DEPLOYMENT_FILE
+                DEBUG: 'true'
+          caches:
+            - docker
+          services:
+            - docker
+          size: 2x
+    master:
+      - step:
+          runs-on:
+            - self.hosted
+          name: PROD - Build, Push image & deploy to EKS
+          deployment: production
+          script:
+            # Sample tag: prod-webapp-v0.1.0-123
+            # - IMAGE_TAG_PREFIX=prod-webapp-v
+            # - LATEST_TAG_VERSION=0.1.0
+            # - BITBUCKET_BUILD_NUMBER=123
+            - export LATEST_TAG_VERSION=$(git describe --tags $(git rev-list --tags --max-count=1))
+            - export ECR_IMAGE_TAG=$IMAGE_TAG_PREFIX$LATEST_TAG_VERSION-$BITBUCKET_BUILD_NUMBER
+            # Generate .env file
+            - echo "NODE_ENV=${NODE_ENV}" > .env
+            - echo "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" >> .env
+            - echo "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" >> .env
+            # Cognito
+            - echo "AWS_PROJECT_REGION=${AWS_PROJECT_REGION}" >> .env
+            - echo "AWS_USER_POOLS_ID=${AWS_USER_POOLS_ID}" >> .env
+            - echo "AWS_USERPOOLS_WEB_CLIENT_ID=${AWS_USERPOOLS_WEB_CLIENT_ID}" >> .env
+            - echo "SOCIAL_LOGIN_DOMAIN=${SOCIAL_LOGIN_DOMAIN}" >> .env
+            - echo "SOCIAL_LOGIN_REDIRECT=${SOCIAL_LOGIN_REDIRECT}" >> .env
+            - echo "CDN_URL=${CDN_URL}" >> .env
+            - echo "CDN_IMAGE_URL=${CDN_IMAGE_URL}" >> .env
+            - echo "GOOGLE_MAP_API_KEY=${GOOGLE_MAP_API_KEY}" >> .env
+            - echo "GOOGLE_TAG_ID=${GOOGLE_TAG_ID}" >> .env
+            - echo "BUSINESS_URL=${BUSINESS_URL}" >> .env
+            - echo "BUSINESS_LOGIN_URL=${BUSINESS_LOGIN_URL}" >> .env
+            - echo "BUSINESS_SIGNUP_URL=${BUSINESS_SIGNUP_URL}" >> .env
+            # Docker build
+            - >
+              docker build . --file Dockerfile --tag ${ECR_REPOSITORY_NAME}
+              --build-arg AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+              --build-arg AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+              --build-arg AWS_REGION=$AWS_DEFAULT_REGION
+              --build-arg BUCKET_NAME=$AWS_S3_BUCKET_NAME
+            - pipe: atlassian/aws-ecr-push-image:1.5.0
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                IMAGE_NAME: $ECR_REPOSITORY_NAME
+                TAGS: '${ECR_IMAGE_TAG}'
+            # Consumer: Update new image tag into deployment manifest.
+            - export EKS_K8S_DEPLOYMENT_FILE="aws/eks/foodme-discover-webapp.deployment.yaml"
+            - sed -i "s|${ECR_ORI_IMG_TAG}|${ECR_IMAGE_TAG}|g" ${EKS_K8S_DEPLOYMENT_FILE}
+            - pipe: atlassian/aws-eks-kubectl-run:2.2.0
+              variables:
+                AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+                AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                CLUSTER_NAME: $EKS_CLUSTER_NAME
+                KUBECTL_COMMAND: 'apply'
+                RESOURCE_PATH: $EKS_K8S_DEPLOYMENT_FILE
+                DEBUG: 'true'
+            # Venue app: Using the same image tag with consumer
+            - export EKS_K8S_VENUE_DEPLOYMENT_FILE="aws/eks/foodme-discover-venue-webapp.deployment.yaml"
+            - sed -i "s|${ECR_ORI_IMG_TAG}|${ECR_IMAGE_TAG}|g" ${EKS_K8S_VENUE_DEPLOYMENT_FILE}
+            - pipe: atlassian/aws-eks-kubectl-run:2.2.0
+              variables:
+                AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+                AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                CLUSTER_NAME: $EKS_CLUSTER_NAME
+                KUBECTL_COMMAND: 'apply'
+                RESOURCE_PATH: $EKS_K8S_VENUE_DEPLOYMENT_FILE
+                DEBUG: 'true'
+          services:
+            - docker
+          size: 2x
